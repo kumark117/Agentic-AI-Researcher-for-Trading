@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Test-Path \"C:\\\\Users\\\\kumar\\\\OneDrive\\\\Desktop\\\\PORTFOLIO PROJECTS - GITs\\\\Agentic AI Researcher for Trading\\\\backend\\\\.venv\\\\Scripts\\\\Activate.ps1\")"
+    ]
+  }
+}

@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Secrets
+.env
+backend/.env
+
+# Generated data (downloaded at runtime)
+backend/data/historical/*.csv
+backend/outputs/signals/*.json
+
+# Node
+node_modules/
+.next/
+out/
+
+# Frontend secrets
+frontend/.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.idea/
+.vscode/
+*.swp
