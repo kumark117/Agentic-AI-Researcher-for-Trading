@@ -6,12 +6,12 @@ import httpx
 
 AV_BASE = "https://www.alphavantage.co/query"
 
-# ETF/commodity proxies via Alpha Vantage (cloud-friendly, no IP blocking).
-# "stock"     → GLOBAL_QUOTE (returns high/low/volume)
-# "commodity" → AV commodity function (daily series, close only)
+# Alpha Vantage config per metal.
+# "commodity" uses AV's physical commodity function → actual spot price.
+# "stock"     uses GLOBAL_QUOTE on an ETF proxy (no direct commodity function).
 AV_CONFIG: dict[str, dict] = {
-    "GOLD":    {"type": "stock",     "symbol": "GLD"},
-    "SILVER":  {"type": "stock",     "symbol": "SLV"},
+    "GOLD":    {"type": "commodity", "function": "GOLD"},
+    "SILVER":  {"type": "commodity", "function": "SILVER"},
     "COPPER":  {"type": "commodity", "function": "COPPER"},
     "URANIUM": {"type": "stock",     "symbol": "URA"},
     "ZINC":    {"type": "stock",     "symbol": "DBB"},
@@ -25,6 +25,39 @@ def _api_key() -> str:
     return key
 
 
+def _check_rate_limit(data: dict) -> None:
+    if "Note" in data or "Information" in data:
+        msg = data.get("Note") or data.get("Information", "")
+        raise RuntimeError(f"Alpha Vantage rate limit reached: {msg[:120]}")
+
+
+def _fetch_commodity_live_sync(function: str) -> dict[str, Any]:
+    resp = httpx.get(
+        AV_BASE,
+        params={"function": function, "interval": "daily", "apikey": _api_key()},
+        timeout=20,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    _check_rate_limit(data)
+    rows = data.get("data", [])
+    if not rows:
+        return {"error": f"No commodity data returned for {function}"}
+    latest = rows[0]
+    prev = rows[1] if len(rows) > 1 else rows[0]
+    price = float(latest["value"])
+    prev_price = float(prev["value"])
+    change_pct = ((price - prev_price) / prev_price * 100) if prev_price else 0.0
+    return {
+        "price": round(price, 2),
+        "change_pct": round(change_pct, 3),
+        "high_24h": round(price, 2),
+        "low_24h": round(price, 2),
+        "volume": None,
+        "date": latest["date"],
+    }
+
+
 def _fetch_stock_quote_sync(symbol: str) -> dict[str, Any]:
     resp = httpx.get(
         AV_BASE,
@@ -32,7 +65,9 @@ def _fetch_stock_quote_sync(symbol: str) -> dict[str, Any]:
         timeout=20,
     )
     resp.raise_for_status()
-    quote = resp.json().get("Global Quote", {})
+    data = resp.json()
+    _check_rate_limit(data)
+    quote = data.get("Global Quote", {})
     if not quote or not quote.get("05. price"):
         return {"error": f"No quote data for {symbol}"}
     price = float(quote["05. price"])
@@ -48,42 +83,17 @@ def _fetch_stock_quote_sync(symbol: str) -> dict[str, Any]:
     }
 
 
-def _fetch_commodity_live_sync(function: str) -> dict[str, Any]:
-    resp = httpx.get(
-        AV_BASE,
-        params={"function": function, "interval": "daily", "apikey": _api_key()},
-        timeout=20,
-    )
-    resp.raise_for_status()
-    data = resp.json().get("data", [])
-    if not data:
-        return {"error": f"No commodity data for {function}"}
-    latest = data[0]
-    prev = data[1] if len(data) > 1 else data[0]
-    price = float(latest["value"])
-    prev_price = float(prev["value"])
-    change_pct = ((price - prev_price) / prev_price * 100) if prev_price else 0.0
-    return {
-        "price": round(price, 2),
-        "change_pct": round(change_pct, 3),
-        "high_24h": round(price, 2),
-        "low_24h": round(price, 2),
-        "volume": None,
-        "date": latest["date"],
-    }
-
-
 async def get_live_price(metal: str, market: str) -> dict[str, Any]:
     metal = metal.upper()
     config = AV_CONFIG.get(metal)
     if not config:
         return {"error": f"No Alpha Vantage config for {metal}"}
     try:
-        if config["type"] == "stock":
-            result = await asyncio.to_thread(_fetch_stock_quote_sync, config["symbol"])
-        else:
+        if config["type"] == "commodity":
             result = await asyncio.to_thread(_fetch_commodity_live_sync, config["function"])
-        result.update({"ticker": config.get("symbol", config.get("function")), "market": market})
+        else:
+            result = await asyncio.to_thread(_fetch_stock_quote_sync, config["symbol"])
+        result.update({"ticker": config.get("function", config.get("symbol")), "market": market})
         return result
     except Exception as e:
         return {"error": str(e)}

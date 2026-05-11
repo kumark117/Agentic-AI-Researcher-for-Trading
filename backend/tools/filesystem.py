@@ -53,7 +53,10 @@ def _fetch_and_cache(metal: str, market: str) -> pd.DataFrame:
                 params={"function": config["function"], "interval": "daily", "apikey": api_key},
                 timeout=30,
             )
-            rows = resp.json().get("data", [])
+            body = resp.json()
+            if "Note" in body or "Information" in body:
+                return pd.DataFrame()
+            rows = body.get("data", [])
             if not rows:
                 return pd.DataFrame()
             df = pd.DataFrame(rows)
@@ -71,7 +74,10 @@ def _fetch_and_cache(metal: str, market: str) -> pd.DataFrame:
                 },
                 timeout=30,
             )
-            ts = resp.json().get("Time Series (Daily)", {})
+            body = resp.json()
+            if "Note" in body or "Information" in body:
+                return pd.DataFrame()
+            ts = body.get("Time Series (Daily)", {})
             if not ts:
                 return pd.DataFrame()
             records = [
