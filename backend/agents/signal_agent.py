@@ -1,4 +1,5 @@
 import json
+import math
 import os
 from datetime import datetime, timezone
 
@@ -45,11 +46,23 @@ async def run(
         "Reason holistically: identify converging signals, note conflicting evidence, flag risks. "
         "You MUST call submit_signal to deliver your output."
     )
+    def _safe(v):
+        if isinstance(v, float) and math.isnan(v):
+            return None
+        return v
+
+    def _sanitize(obj):
+        if isinstance(obj, dict):
+            return {k: _sanitize(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [_sanitize(i) for i in obj]
+        return _safe(obj)
+
     user_msg = (
         f"Generate a {metal} trading signal for {market}.\n\n"
-        f"PRICE DATA:\n{json.dumps(price_data, indent=2)}\n\n"
-        f"NEWS & SENTIMENT:\n{json.dumps(news_data, indent=2)}\n\n"
-        f"TECHNICAL ANALYSIS:\n{json.dumps(technical_data, indent=2)}"
+        f"PRICE DATA:\n{json.dumps(_sanitize(price_data), indent=2)}\n\n"
+        f"NEWS & SENTIMENT:\n{json.dumps(_sanitize(news_data), indent=2)}\n\n"
+        f"TECHNICAL ANALYSIS:\n{json.dumps(_sanitize(technical_data), indent=2)}"
     )
 
     response = await client.messages.create(
@@ -72,16 +85,16 @@ async def run(
     signal = {
         "asset":              metal,
         "market":             market,
-        "signal":             signal_input["signal"],
-        "confidence":         signal_input["confidence"],
-        "rationale":          signal_input["rationale"],
-        "price_summary":      signal_input["price_summary"],
-        "technical_summary":  signal_input["technical_summary"],
-        "sentiment_summary":  signal_input["sentiment_summary"],
-        "risk_flags":         signal_input["risk_flags"],
-        "price_data":         price_data,
-        "technical_data":     technical_data,
-        "news_data":          news_data,
+        "signal":             signal_input.get("signal", "HOLD"),
+        "confidence":         signal_input.get("confidence", 0.0),
+        "rationale":          signal_input.get("rationale", ""),
+        "price_summary":      signal_input.get("price_summary", ""),
+        "technical_summary":  signal_input.get("technical_summary", ""),
+        "sentiment_summary":  signal_input.get("sentiment_summary", ""),
+        "risk_flags":         signal_input.get("risk_flags", []),
+        "price_data":         _sanitize(price_data),
+        "technical_data":     _sanitize(technical_data),
+        "news_data":          _sanitize(news_data),
         "generated_at":       datetime.now(timezone.utc).isoformat(),
     }
 
