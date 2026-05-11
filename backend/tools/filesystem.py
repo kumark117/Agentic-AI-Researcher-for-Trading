@@ -1,13 +1,14 @@
 import asyncio
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pandas as pd
-import yfinance as yf
 
-from tools.price_feed import TICKERS
+from tools.price_feed import AV_CONFIG, AV_BASE
 
 DATA_DIR = Path(__file__).parent.parent / "data" / "historical"
 SIGNALS_DIR = Path(__file__).parent.parent / "outputs" / "signals"
@@ -41,14 +42,55 @@ def _macd(closes: pd.Series) -> dict[str, Any]:
 
 def _fetch_and_cache(metal: str, market: str) -> pd.DataFrame:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    ticker_sym = TICKERS.get(metal, {}).get(market)
-    if not ticker_sym:
+    config = AV_CONFIG.get(metal)
+    if not config:
         return pd.DataFrame()
-    df = yf.Ticker(ticker_sym).history(period="1y")
-    if not df.empty:
-        df.index.name = "Date"
-        df.to_csv(DATA_DIR / f"{metal}_{market}.csv")
-    return df
+    api_key = os.getenv("ALPHA_VANTAGE_API_KEY", "")
+    try:
+        if config["type"] == "commodity":
+            resp = httpx.get(
+                AV_BASE,
+                params={"function": config["function"], "interval": "daily", "apikey": api_key},
+                timeout=30,
+            )
+            rows = resp.json().get("data", [])
+            if not rows:
+                return pd.DataFrame()
+            df = pd.DataFrame(rows)
+            df.index = pd.to_datetime(df["date"])
+            df["Close"] = df["value"].astype(float)
+            df = df[["Close"]].sort_index()
+        else:
+            resp = httpx.get(
+                AV_BASE,
+                params={
+                    "function": "TIME_SERIES_DAILY",
+                    "symbol": config["symbol"],
+                    "outputsize": "full",
+                    "apikey": api_key,
+                },
+                timeout=30,
+            )
+            ts = resp.json().get("Time Series (Daily)", {})
+            if not ts:
+                return pd.DataFrame()
+            records = [
+                {
+                    "Date": pd.to_datetime(date),
+                    "Close": float(vals["4. close"]),
+                    "High": float(vals["2. high"]),
+                    "Low": float(vals["3. low"]),
+                    "Volume": int(vals["5. volume"]),
+                }
+                for date, vals in ts.items()
+            ]
+            df = pd.DataFrame(records).set_index("Date").sort_index()
+
+        if not df.empty:
+            df.to_csv(DATA_DIR / f"{metal}_{market}.csv")
+        return df
+    except Exception:
+        return pd.DataFrame()
 
 
 def _compute_indicators_sync(metal: str, market: str) -> dict[str, Any]:
