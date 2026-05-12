@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
+from mcp_client import start_mcp_server, stop_mcp_server
 from orchestrator import research
 from streaming.log_queue import broadcast
 from streaming.sse import log_event_generator
@@ -18,8 +19,10 @@ from streaming.sse import log_event_generator
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await start_mcp_server()
     app.state.current_task = None
     yield
+    await stop_mcp_server()
 
 
 app = FastAPI(title="Agentic AI Researcher for Trading", version="1.0.0", lifespan=lifespan)

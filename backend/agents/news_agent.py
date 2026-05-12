@@ -1,7 +1,6 @@
 import json
 
 from agents.react_runner import run_react
-from tools.web_search import search_news
 
 _TOOLS = [
     {
@@ -18,9 +17,6 @@ _TOOLS = [
     }
 ]
 
-_TOOL_MAP = {"search_news": search_news}
-
-
 async def run(metal: str) -> dict:
     system = (
         f"You are a financial news and sentiment agent specialising in {metal} markets. "
@@ -35,7 +31,7 @@ async def run(metal: str) -> dict:
         "Use multiple search queries to get a well-rounded picture."
     )
 
-    raw = await run_react("News Agent", metal, system, user_msg, _TOOLS, _TOOL_MAP, max_iterations=5)
+    raw = await run_react("News Agent", metal, system, user_msg, _TOOLS, max_iterations=5)
     try:
         start, end = raw.find("{"), raw.rfind("}") + 1
         if start >= 0 and end > start:

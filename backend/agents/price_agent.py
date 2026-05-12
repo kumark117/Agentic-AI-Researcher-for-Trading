@@ -1,8 +1,6 @@
 import json
 
 from agents.react_runner import run_react
-from tools.currency_converter import convert_usd_to_inr
-from tools.price_feed import get_live_price
 
 _TOOLS = [
     {
@@ -30,12 +28,6 @@ _TOOLS = [
     },
 ]
 
-_TOOL_MAP = {
-    "get_live_price": get_live_price,
-    "convert_usd_to_inr": convert_usd_to_inr,
-}
-
-
 async def run(metal: str, market: str) -> dict:
     system = (
         f"You are a live price data agent for commodity markets. "
@@ -47,7 +39,7 @@ async def run(metal: str, market: str) -> dict:
     )
     user_msg = f"Get current price data for {metal} on {market}. Include INR equivalent."
 
-    raw = await run_react("Price Agent", metal, system, user_msg, _TOOLS, _TOOL_MAP)
+    raw = await run_react("Price Agent", metal, system, user_msg, _TOOLS)
     try:
         start, end = raw.find("{"), raw.rfind("}") + 1
         if start >= 0 and end > start:

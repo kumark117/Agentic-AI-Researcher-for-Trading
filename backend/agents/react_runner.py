@@ -1,10 +1,11 @@
 import json
 import os
 from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 import anthropic
 
+from mcp_client import call_tool
 from streaming.log_queue import broadcast
 
 _client: anthropic.AsyncAnthropic | None = None
@@ -33,9 +34,14 @@ async def run_react(
     system: str,
     user_message: str,
     tools: list[dict],
-    tool_map: dict[str, Callable[..., Awaitable[Any]]],
     max_iterations: int = 6,
 ) -> str:
+    """
+    ReAct loop — Reason → Act → Observe → repeat.
+
+    Tool calls are dispatched through the MCP client (call_tool) instead of
+    direct Python function imports. The MCP server process handles execution.
+    """
     client = get_client()
     model = os.getenv("LLM_MODEL", "claude-sonnet-4-6")
     messages: list[dict] = [{"role": "user", "content": user_message}]
@@ -63,8 +69,9 @@ async def run_react(
             for block in response.content:
                 if block.type == "tool_use":
                     await emit(agent_name, "Act", metal, f"{block.name}({json.dumps(block.input)[:80]})")
-                    fn = tool_map.get(block.name)
-                    result = await fn(**block.input) if fn else {"error": f"Unknown tool: {block.name}"}
+                    # ── MCP dispatch ──────────────────────────────────────────
+                    result = await call_tool(block.name, block.input)
+                    # ─────────────────────────────────────────────────────────
                     await emit(agent_name, "Observe", metal, str(result)[:140])
                     tool_results.append({
                         "type": "tool_result",

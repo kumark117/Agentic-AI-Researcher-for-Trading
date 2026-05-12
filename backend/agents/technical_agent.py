@@ -1,7 +1,6 @@
 import json
 
 from agents.react_runner import run_react
-from tools.filesystem import get_technical_indicators
 
 _TOOLS = [
     {
@@ -21,9 +20,6 @@ _TOOLS = [
     }
 ]
 
-_TOOL_MAP = {"get_technical_indicators": get_technical_indicators}
-
-
 async def run(metal: str, market: str) -> dict:
     system = (
         f"You are a technical analysis agent for {metal} on {market}. "
@@ -39,7 +35,7 @@ async def run(metal: str, market: str) -> dict:
     )
     user_msg = f"Perform technical analysis on {metal} ({market}) using historical price data."
 
-    raw = await run_react("Technical Agent", metal, system, user_msg, _TOOLS, _TOOL_MAP)
+    raw = await run_react("Technical Agent", metal, system, user_msg, _TOOLS)
     try:
         start, end = raw.find("{"), raw.rfind("}") + 1
         if start >= 0 and end > start:
