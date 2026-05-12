@@ -158,14 +158,35 @@ async def run(metal, market):
 
 ---
 
-## Tool Layer (MCP)
+## Tool Layer (MCP — Model Context Protocol)
 
-| Tool                | File                          | Used By          | Purpose                     |
-|---------------------|-------------------------------|------------------|-----------------------------|
-| web_search          | `tools/web_search.py`         | News Agent       | Fetch latest headlines      |
-| price_feed          | `tools/price_feed.py`         | Price Agent      | Live COMEX / MCX / LME      |
-| currency_converter  | `tools/currency_converter.py` | Price Agent      | USD ↔ INR conversion        |
-| filesystem          | `tools/filesystem.py`         | Technical Agent  | Read/write historical CSVs  |
+Tools are exposed via a real **MCP server** (`mcp_server.py`) running as a subprocess
+over **stdio transport**. Agents never import tool functions directly — all tool calls
+are dispatched through the MCP client (`mcp_client.py`) using the standard MCP
+JSON-RPC protocol. Any MCP-compatible client (Claude Desktop, other agents) can
+connect to the same server independently.
+
+```
+FastAPI startup
+  └─ mcp_client.start_mcp_server()
+       └─ spawns mcp_server.py subprocess (stdio)
+            └─ ClientSession.initialize()   ← MCP handshake
+
+Per tool call (inside ReAct loop):
+  react_runner.py
+    └─ mcp_client.call_tool(name, args)
+         └─ ClientSession.call_tool()       ← MCP JSON-RPC
+              └─ mcp_server.py @mcp.tool()  ← executes tool function
+                   └─ returns result via stdio
+```
+
+| MCP Tool            | File                          | Used By                   | Purpose                      |
+|---------------------|-------------------------------|---------------------------|------------------------------|
+| get_live_price      | `tools/price_feed.py`         | Price Agent               | Live price via Alpha Vantage |
+| search_news         | `tools/web_search.py`         | News Agent                | News search via Tavily       |
+| get_technical_indicators | `tools/filesystem.py`    | Technical Agent           | RSI, MACD, MAs from history  |
+| convert_usd_to_inr  | `tools/currency_converter.py` | Price Agent               | USD ↔ INR via Alpha Vantage  |
+| save_signal         | `tools/filesystem.py`         | Signal Agent              | Persist signal JSON to disk  |
 
 ---
 
@@ -285,16 +306,18 @@ NEXT_PUBLIC_BACKEND_URL=https://art-backend.onrender.com
 
 ## Stack Summary
 
-| Layer                | Technology                                      |
-|----------------------|-------------------------------------------------|
-| Frontend             | Next.js 14 (App Router) + Tailwind CSS          |
-| Backend              | Python 3.11 + FastAPI                           |
-| Agent Orchestration  | Anthropic SDK — raw ReAct loop, no frameworks   |
-| Tool Protocol        | MCP (Model Context Protocol)                    |
-| Parallelism          | asyncio.gather()                                |
-| Log Streaming        | SSE (Server-Sent Events) FastAPI → Next.js      |
-| Deployment           | Render (2 persistent Web Services)              |
-| Version Control      | GitHub (monorepo)                               |
+| Layer                | Technology                                                        |
+|----------------------|-------------------------------------------------------------------|
+| Frontend             | Next.js 14 (App Router) + Tailwind CSS                           |
+| Backend              | Python 3.11 + FastAPI                                            |
+| Agent Orchestration  | Anthropic SDK — raw ReAct loop, no frameworks                    |
+| Tool Protocol        | MCP (Model Context Protocol) — real stdio server + ClientSession |
+| Data — Live Price    | Alpha Vantage commodity & stock API                              |
+| Data — News          | Tavily Search API                                                |
+| Parallelism          | asyncio.gather()                                                 |
+| Log Streaming        | SSE (Server-Sent Events) FastAPI → Next.js                       |
+| Deployment           | Render (2 persistent Web Services)                               |
+| Version Control      | GitHub (monorepo)                                                |
 
 ---
 

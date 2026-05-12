@@ -4,7 +4,7 @@ import os
 from datetime import datetime, timezone
 
 from agents.react_runner import emit, get_client
-from tools.filesystem import save_signal
+from mcp_client import call_tool
 
 _SUBMIT_TOOL = {
     "name": "submit_signal",
@@ -98,7 +98,7 @@ async def run(
         "generated_at":       datetime.now(timezone.utc).isoformat(),
     }
 
-    await save_signal(signal)
+    await call_tool("save_signal", {"signal": signal})
     await emit(
         "Signal Agent", "Output", metal,
         f"{signal['signal']} {metal} {market} — confidence {signal['confidence']:.2f}",
