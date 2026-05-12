@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "How It Works — Agentic AI Researcher for Trading",
+  title: "How It Works — Agentic AI Researcher for Trading (MCP)",
 };
 
 /* ── small layout helpers ──────────────────────────────────────── */
@@ -73,7 +73,7 @@ export default function HowItWorks() {
       <header className="border-b border-gray-800 bg-gray-900/50">
         <div className="max-w-4xl mx-auto px-6 py-12">
           <p className="text-emerald-400 text-xs uppercase tracking-widest mb-3">
-            Agentic AI Researcher for Trading
+            Agentic AI Researcher for Trading (MCP)
           </p>
           <h1 className="text-3xl font-bold text-white mb-4">
             How does it work?

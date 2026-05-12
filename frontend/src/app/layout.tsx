@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Agentic AI Researcher for Trading",
+  title: "Agentic AI Researcher for Trading (MCP)",
   description: "Autonomous multi-agent research system for Gold, Silver, Copper, Uranium & Zinc",
 };
 

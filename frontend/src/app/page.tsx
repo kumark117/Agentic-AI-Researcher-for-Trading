@@ -71,7 +71,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-white tracking-tight">
-              Agentic AI Researcher for Trading
+              Agentic AI Researcher for Trading (MCP)
             </h1>
             <p className="text-xs text-gray-500 mt-0.5">
               Gold · Silver · Copper · Uranium · Zinc — COMEX / MCX
