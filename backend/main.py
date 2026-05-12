@@ -74,4 +74,4 @@ async def stream_logs():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    return {"status": "ok", "service": "Agentic AI Researcher for Trading (MCP)"}
