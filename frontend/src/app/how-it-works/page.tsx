@@ -94,7 +94,7 @@ export default function HowItWorks() {
           <div className="flex flex-wrap gap-2 mt-5">
             {[
               ["Agentic AI",       "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"],
-              ["MCP Tools",        "bg-purple-500/20  text-purple-400  border border-purple-500/40" ],
+              ["MCP Server/Client", "bg-purple-500/20  text-purple-400  border border-purple-500/40" ],
               ["Real-time SSE",    "bg-blue-500/20    text-blue-400    border border-blue-500/40"   ],
               ["Parallel Agents",  "bg-cyan-500/20    text-cyan-400    border border-cyan-500/40"   ],
               ["FastAPI + Next.js","bg-yellow-500/20  text-yellow-400  border border-yellow-500/40" ],
@@ -167,24 +167,29 @@ export default function HowItWorks() {
               🔌 MCP — Model Context Protocol
             </div>
             <p className="text-gray-300 text-sm leading-relaxed mb-3">
-              <span className="text-purple-300 font-bold">MCP</span> is the standard protocol
-              through which AI agents call external tools. Instead of hardcoding API calls inside
-              the model logic, each capability is exposed as a named, schema-validated tool that
-              Claude can discover and call by name.
+              This project runs a <span className="text-purple-300 font-bold">real MCP server</span>{" "}
+              (<code className="text-purple-200">mcp_server.py</code>) as a subprocess using{" "}
+              <span className="text-purple-300 font-bold">FastMCP</span>. Tools are registered with{" "}
+              <code className="text-purple-200">@mcp.tool()</code> and communicated over a{" "}
+              <span className="text-white font-bold">stdio transport</span> using JSON-RPC — the full MCP protocol, not just labeled wrappers.
             </p>
             <p className="text-gray-400 text-sm leading-relaxed mb-4">
-              This project implements four MCP tools. Claude decides <em>when</em> to call them and
-              <em> what arguments</em> to pass — the system just executes and returns the result.
+              A <code className="text-purple-200">ClientSession</code> client connects to the server at startup.
+              Inside each ReAct loop, when Claude decides to call a tool, the call is dispatched
+              through <code className="text-purple-200">ClientSession.call_tool()</code> — never as a direct
+              Python import. Any MCP-compatible host (Claude Desktop, other agents) can connect to
+              the same server independently.
             </p>
             <div className="space-y-2">
               {[
-                ["price_feed",          "Live COMEX / LME commodity prices via yfinance"],
-                ["currency_converter",  "Real-time USD → INR exchange rate"],
-                ["web_search",          "DuckDuckGo news search — no API key needed"],
-                ["get_tech_indicators", "RSI, MACD, MA50/200 from historical CSV data"],
+                ["get_live_price",            "Alpha Vantage commodity API — real COMEX spot prices"],
+                ["search_news",               "Tavily Search API — financial news & sentiment"],
+                ["get_technical_indicators",  "RSI, MACD, MA50/200 from historical CSV data"],
+                ["convert_usd_to_inr",        "Alpha Vantage currency exchange rate (USD → INR)"],
+                ["save_signal",               "Persists final signal JSON to disk"],
               ].map(([tool, desc]) => (
                 <div key={tool as string} className="flex gap-3 text-xs">
-                  <code className="shrink-0 text-purple-300 w-36">{tool}</code>
+                  <code className="shrink-0 text-purple-300 w-44">{tool}</code>
                   <span className="text-gray-500">{desc}</span>
                 </div>
               ))}
@@ -252,7 +257,7 @@ export default function HowItWorks() {
                     <div className="text-blue-400/60 text-xs leading-relaxed">
                       Multi-query web search<br />
                       Scores sentiment −1.0 → +1.0<br />
-                      Tool: web_search (DuckDuckGo)
+                      Tool: search_news (Tavily)
                     </div>
                   </DiagramBox>
                 </div>
@@ -428,9 +433,9 @@ export default function HowItWorks() {
               leaving the log panel visible so the user can see how far the agents got.
             </p>
             <p className="mt-2 text-gray-600 text-xs italic">
-              Note: tool calls running in thread pools (yfinance, DuckDuckGo) cannot be killed mid-thread
-              — they finish in the background, but their results are discarded since the awaiting
-              coroutine is already cancelled.
+              Note: any in-flight MCP tool call (Alpha Vantage, Tavily) running at the moment of
+              cancellation completes in the background — but its result is discarded since the
+              awaiting coroutine is already cancelled.
             </p>
           </Step>
         </div>
@@ -441,6 +446,11 @@ export default function HowItWorks() {
         <h2 className="text-lg font-bold text-white mb-6">Why this is technically interesting</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[
+            {
+              title: "Real MCP server/client",
+              desc:  "mcp_server.py runs as a subprocess using FastMCP. Tools are registered with @mcp.tool() and dispatched over stdio JSON-RPC via ClientSession.call_tool() — the full MCP protocol. Any MCP-compatible host (Claude Desktop, other agents) can connect to the same server independently.",
+              color: "border-l-purple-500",
+            },
             {
               title: "No agent framework",
               desc:  "The ReAct loop is implemented from scratch using the Anthropic SDK's tool-use API — no LangChain, no CrewAI. This means full control, no hidden abstractions, and a clear mental model of what the LLM is doing at every step.",
@@ -459,7 +469,7 @@ export default function HowItWorks() {
             {
               title: "Multi-subscriber SSE broadcast",
               desc:  "The log queue supports multiple simultaneous browser connections. When an agent broadcasts an event, it lands in every subscriber's queue — multiple browser tabs all see the same live stream independently.",
-              color: "border-l-purple-500",
+              color: "border-l-indigo-500",
             },
             {
               title: "True async cancellation",
@@ -485,9 +495,10 @@ export default function HowItWorks() {
             ["Backend",         "FastAPI + uvicorn",          "text-green-400"  ],
             ["Language",        "Python 3.11+",               "text-yellow-400" ],
             ["AI Model",        "Claude (Anthropic SDK)",     "text-pink-400"   ],
-            ["Market Data",     "yfinance (COMEX / LME)",     "text-orange-400" ],
-            ["News Search",     "DuckDuckGo (no API key)",    "text-gray-300"   ],
-            ["Log Streaming",   "Server-Sent Events (SSE)",   "text-purple-400" ],
+            ["Tool Protocol",   "MCP Server/Client (stdio)",  "text-purple-400" ],
+            ["Market Data",     "Alpha Vantage API",          "text-orange-400" ],
+            ["News Search",     "Tavily Search API",          "text-gray-300"   ],
+            ["Log Streaming",   "Server-Sent Events (SSE)",   "text-blue-400"   ],
             ["Deployment",      "Render (2 Web Services)",    "text-emerald-400"],
           ].map(([layer, tech, color]) => (
             <div key={layer as string} className="bg-gray-900 border border-gray-800 rounded-lg p-3">
